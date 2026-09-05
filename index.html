@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HyFlex — Gesture Lecture Recorder</title>
+  <link rel="stylesheet" href="css/style.css">
+
+  <!--
+    Third-party libraries, pinned exact versions (verified against CDN 2026-09-06).
+    hand-pose-detection uses the MediaPipe (WASM) runtime — @mediapipe/hands
+    supplies the solution assets; tfjs-core is still required by the
+    hand-pose-detection UMD bundle. Both expose globals (`tf`, `Hands`,
+    `handPoseDetection`). pdf.js is ESM and imported from js/slides.js.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.22.0/dist/tf-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js"></script>
+</head>
+<body>
+  <div id="stage-wrap">
+    <!-- ONLY #stage is recorded. -->
+    <canvas id="stage" width="1280" height="720"></canvas>
+    <!-- Overlays: drawn on screen for the professor, never captured. -->
+    <canvas id="overlay" width="1280" height="720"></canvas>
+    <div id="border"></div>
+  </div>
+
+  <div id="controls">
+    <label>PDF <input type="file" id="pdf-input" accept="application/pdf"></label>
+    <button id="btn-screen">Pick Screen</button>
+    <button id="btn-start">Start Recording</button>
+    <button id="btn-stop" disabled>Stop Recording</button>
+    <span id="status">starting…</span>
+  </div>
+
+  <p id="help">
+    Keys: <b>1</b> presentation · <b>2</b> whiteboard · <b>3</b> screenshare ·
+    <b>0</b> idle · <b>&larr;/&rarr;</b> slides · <b>Space</b> pause/resume
+  </p>
+
+  <!-- Source media elements, kept off-screen; the compositor samples them. -->
+  <video id="cam" playsinline muted></video>
+  <video id="screen" playsinline muted></video>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
