@@ -35,18 +35,25 @@ async function renderPage(index) {
   if (cache.has(index)) return;
   cache.set(index, null); // mark in-flight
 
-  const page = await doc.getPage(index + 1);
-  const base = page.getViewport({ scale: 1 });
-  const scale = Math.min(CONFIG.STAGE.w / base.width, CONFIG.STAGE.h / base.height);
-  const viewport = page.getViewport({ scale });
+  try {
+    const page = await doc.getPage(index + 1);
+    const base = page.getViewport({ scale: 1 });
+    const scale = Math.min(CONFIG.STAGE.w / base.width, CONFIG.STAGE.h / base.height);
+    const viewport = page.getViewport({ scale });
 
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil(viewport.width);
-  canvas.height = Math.ceil(viewport.height);
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  await page.render({ canvasContext: ctx, viewport }).promise;
-  cache.set(index, canvas);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    cache.set(index, canvas);
+  } catch (err) {
+    // Drop the in-flight marker so a later frame retries instead of showing
+    // "rendering slide" forever.
+    cache.delete(index);
+    console.error(`[slides] page ${index + 1} failed to render`, err);
+  }
 }

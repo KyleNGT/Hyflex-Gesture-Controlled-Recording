@@ -1,5 +1,5 @@
 // Mechanical hand-geometry helpers. Pure functions of keypoints (mirrored
-// video-pixel space). Shared by the classifiers and the debug overlay.
+// stage-pixel space). Shared by the classifiers and the debug overlay.
 //
 // MediaPipe Hands index map:
 //   0 wrist
@@ -11,6 +11,10 @@
 
 export const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'];
 
+// The four fingers that lie flat in an open palm. The thumb is excluded because
+// it is judged by splay, not by extension along the palm axis.
+export const FLAT_FINGERS = ['index', 'middle', 'ring', 'pinky'];
+
 const JOINTS = {
   thumb: { mcp: 2, pip: 3, tip: 4 },
   index: { mcp: 5, pip: 6, tip: 8 },
@@ -21,6 +25,10 @@ const JOINTS = {
 
 export function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+export function midpoint(a, b) {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
 export function handScale(kp) {
@@ -52,6 +60,13 @@ export function fingerStates(kp) {
   return out;
 }
 
+// How many of index/middle/ring/pinky are extended -- "is this palm open?".
+export function flatFingerCount(kp) {
+  let n = 0;
+  for (const f of FLAT_FINGERS) if (isExtended(kp, f)) n++;
+  return n;
+}
+
 // thumb-tip <-> index-tip separation, normalized by hand scale.
 export function pinchAmount(kp) {
   return dist(kp[4], kp[8]) / handScale(kp);
@@ -60,8 +75,22 @@ export function pinchAmount(kp) {
 // Unit vector from a finger's MCP to its tip (pointing direction).
 export function fingerDirection(kp, finger) {
   const j = JOINTS[finger];
-  const dx = kp[j.tip].x - kp[j.mcp].x;
-  const dy = kp[j.tip].y - kp[j.mcp].y;
+  return unit(kp[j.tip].x - kp[j.mcp].x, kp[j.tip].y - kp[j.mcp].y);
+}
+
+// The hand's own axis: wrist -> middle MCP. Points the way the palm "aims"
+// regardless of which fingers are curled, so it survives a fist.
+export function palmDirection(kp) {
+  return unit(kp[9].x - kp[0].x, kp[9].y - kp[0].y);
+}
+
+// Unsigned angle between two unit vectors, in degrees (0..180).
+export function angleBetween(a, b) {
+  const d = Math.max(-1, Math.min(1, a.x * b.x + a.y * b.y));
+  return (Math.acos(d) * 180) / Math.PI;
+}
+
+function unit(dx, dy) {
   const len = Math.hypot(dx, dy) || 1;
   return { x: dx / len, y: dy / len };
 }
