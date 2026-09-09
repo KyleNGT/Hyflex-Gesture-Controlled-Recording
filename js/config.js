@@ -54,6 +54,10 @@ export const CONFIG = {
   STAGE: { w: 1280, h: 720 },
   PIP: { w: 320, h: 180, margin: 24 },
 
-  // --- dev ---
-  DEBUG: true,             // draw skeleton + finger readout + action-zone line
+  // --- studio overlay ---
+  // On-screen aids only; NONE of this is composited onto the stage canvas, so
+  // none of it reaches the recording. `on` is the master switch; the three
+  // sub-flags gate individual layers. The dwell ring and clutch meter ignore
+  // these -- they are core HCI feedback, not debug chrome.
+  OVERLAY: { on: true, metrics: true, skeleton: true, guide: true },
 };

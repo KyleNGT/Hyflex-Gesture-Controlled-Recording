@@ -1,13 +1,21 @@
-// On-screen feedback for the professor: the red/yellow state border, the status
-// line, the command toast, and the overlay canvas (dwell ring + clutch meter +
-// debug skeleton). None of this is recorded -- the overlay is a separate canvas
-// stacked over #stage, and the border is a full-viewport frame outside it.
+// All on-screen studio chrome for the professor. None of it is recorded:
+//   - the overlay canvas (dwell ring, clutch meter, and -- when the studio
+//     overlay is on -- the hand skeleton, guide line, and metrics readout),
+//     stacked over #stage but never composited into it
+//   - the red/yellow recording border framing the whole viewport
+//   - the app header (mode chip + REC timer), the status line, the command
+//     toast, the "not in the recording" notice, and the studio-overlay switches
+//
+// CONFIG.OVERLAY is the single source of truth for what the overlay shows;
+// initChrome() keeps the sidebar switches and CONFIG.OVERLAY in sync, and
+// setOverlay()/toggleOverlay() let the `d` key drive the same path.
 
 import { CONFIG } from './config.js';
 import { subscribe } from './state.js';
 import { getStatus } from './gesture-engine.js';
 import { describe } from './gestures/classify.js';
 import { fingerStates } from './gestures/fingers.js';
+import { toggleTuner } from './tuner.js';
 
 const border = document.getElementById('border');
 const statusEl = document.getElementById('status');
@@ -15,11 +23,24 @@ const toastEl = document.getElementById('toast');
 const overlay = document.getElementById('overlay');
 const octx = overlay.getContext('2d');
 
+const modeChip = document.getElementById('mode-chip');
+const recIndicator = document.getElementById('rec-indicator');
+const recTimeEl = document.getElementById('rec-time');
+
 let latestHands = [];
 let toastTimer = 0;
 let stateLine = '';
 let noteLine = '';
 let isRecording = false;
+
+// REC timer: wall-clock minus paused spans (pause genuinely stops the encoder).
+let recActive = false;      // recording AND not paused
+let prevRecording = false;
+let recAccumMs = 0;
+let recResumedAt = 0;
+
+let noticeDismissed = false;
+let chromeSync = () => {};
 
 const HAND_EDGES = [
   [0, 1], [1, 2], [2, 3], [3, 4],
@@ -52,10 +73,18 @@ export function initUI() {
   overlay.width = CONFIG.STAGE.w;
   overlay.height = CONFIG.STAGE.h;
 
+  initChrome();
+
   subscribe((state) => {
     isRecording = state.recording;
     border.classList.toggle('recording', state.recording && !state.paused);
     border.classList.toggle('paused', state.recording && state.paused);
+
+    trackRecTime(state);
+
+    modeChip.textContent = state.mode;
+    recIndicator.hidden = !state.recording;
+    recIndicator.classList.toggle('paused', state.recording && state.paused);
 
     const bits = [`mode: ${state.mode}`];
     if (state.slideCount) bits.push(`slide ${state.slideIndex + 1}/${state.slideCount}`);
@@ -68,10 +97,100 @@ export function initUI() {
 
   const loop = () => {
     renderOverlay();
+    recTimeEl.textContent = fmtClock(currentRecMs());
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);
 }
+
+// --- studio-overlay switches + notice --------------------------------------
+
+function initChrome() {
+  const els = {
+    on: document.getElementById('ov-on'),
+    metrics: document.getElementById('ov-metrics'),
+    skeleton: document.getElementById('ov-skeleton'),
+    guide: document.getElementById('ov-guide'),
+  };
+  const subs = document.getElementById('ov-subs');
+  const guidePanel = document.getElementById('guide-panel');
+  const notice = document.getElementById('notice');
+  const noticeClose = document.getElementById('notice-close');
+  const tunerBtn = document.getElementById('btn-tuner');
+
+  for (const k of ['on', 'metrics', 'skeleton', 'guide']) els[k].checked = CONFIG.OVERLAY[k];
+
+  // Push the checkbox states into CONFIG.OVERLAY and reflect the dependent UI.
+  // announce=true means "if the master switch is now on, surface the notice"
+  // (used on load and whenever the master switch is flipped, not on sub-toggles).
+  chromeSync = (announce) => {
+    const ov = CONFIG.OVERLAY;
+    for (const k of ['on', 'metrics', 'skeleton', 'guide']) ov[k] = els[k].checked;
+
+    subs.classList.toggle('disabled', !ov.on);
+    guidePanel.hidden = !(ov.on && ov.guide);
+
+    if (!ov.on) notice.hidden = true;
+    else if (announce && !noticeDismissed) notice.hidden = false;
+  };
+
+  els.on.addEventListener('change', () => chromeSync(true));
+  for (const k of ['metrics', 'skeleton', 'guide']) {
+    els[k].addEventListener('change', () => chromeSync(false));
+  }
+  noticeClose.addEventListener('click', () => {
+    notice.hidden = true;
+    noticeDismissed = true;
+  });
+  tunerBtn.addEventListener('click', toggleTuner);
+
+  chromeSync(true);
+}
+
+// Called by main.js on the `d` key so keyboard and switch never disagree.
+export function setOverlay(on) {
+  const el = document.getElementById('ov-on');
+  el.checked = on;
+  chromeSync(true);
+}
+
+export function toggleOverlay() {
+  const el = document.getElementById('ov-on');
+  setOverlay(!el.checked);
+  flash(`studio overlay ${el.checked ? 'on' : 'off'}`);
+}
+
+// --- REC timer ------------------------------------------------------------
+
+function trackRecTime(state) {
+  const active = state.recording && !state.paused;
+  const now = performance.now();
+
+  if (state.recording && !prevRecording) {
+    recAccumMs = 0;                     // fresh take
+    recResumedAt = now;
+  } else if (active && !recActive) {
+    recResumedAt = now;                 // resumed from pause
+  } else if (!active && recActive) {
+    recAccumMs += now - recResumedAt;   // paused or stopped
+  }
+
+  recActive = active;
+  prevRecording = state.recording;
+}
+
+function currentRecMs() {
+  return recAccumMs + (recActive ? performance.now() - recResumedAt : 0);
+}
+
+function fmtClock(ms) {
+  const total = Math.floor(ms / 1000);
+  const mm = String(Math.floor(total / 60)).padStart(2, '0');
+  const ss = String(total % 60).padStart(2, '0');
+  return `${mm}:${ss}`;
+}
+
+// --- overlay canvas -----------------------------------------------------
 
 function render() {
   statusEl.textContent = noteLine ? `${stateLine}  -  ${noteLine}` : stateLine;
@@ -79,10 +198,10 @@ function render() {
 
 function renderOverlay() {
   const { w, h } = CONFIG.STAGE;
+  const ov = CONFIG.OVERLAY;
   octx.clearRect(0, 0, w, h);
 
-  if (CONFIG.DEBUG) {
-    // action-zone boundary
+  if (ov.on && ov.skeleton) {
     const zy = CONFIG.ACTION_ZONE_TOP * h;
     octx.strokeStyle = 'rgba(0,200,255,0.5)';
     octx.setLineDash([8, 8]);
@@ -93,9 +212,11 @@ function renderOverlay() {
     octx.setLineDash([]);
 
     for (const hand of latestHands) drawSkeleton(hand);
-    drawReadout();
   }
 
+  if (ov.on && ov.metrics) drawReadout();
+
+  // Core HCI feedback -- always drawn, independent of the studio overlay.
   drawClutchMeter();
   drawDwellRing();
 }

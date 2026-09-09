@@ -1,12 +1,20 @@
 // MediaRecorder wrapper. Captures the stage canvas + mic into ONE file.
 // Pause/resume genuinely stop the encoder, so paused spans leave no dead air in
-// the output. Output is .webm -- in-browser .mp4 recording is not reliable, and
-// the filename says so rather than pretending otherwise.
+// the output.
+//
+// Container: MP4 (H.264 + AAC) is preferred and works in Chromium 126+ and
+// Safari. Chromium writes *fragmented* MP4, which every mainstream player and
+// editor reads. Firefox has no MP4 encoder, so it falls back to WebM/VP9. The
+// download extension always follows the container the browser actually gave us
+// -- a WebM blob is never named .mp4.
 
 import { getMicTrack } from './media.js';
 
 const MIME_CANDIDATES = [
-  'video/webm;codecs=vp9,opus',
+  'video/mp4;codecs=avc1.42E01E,mp4a.40.2',  // H.264 baseline + AAC
+  'video/mp4;codecs=avc1,mp4a.40.2',
+  'video/mp4',                                // Safari
+  'video/webm;codecs=vp9,opus',               // Firefox, older Chromium
   'video/webm;codecs=vp8,opus',
   'video/webm',
 ];
@@ -39,6 +47,20 @@ export function isPaused() {
 
 export function getMimeType() {
   return mimeType;
+}
+
+// The container the browser will actually record in, decided up front so the UI
+// can show it before a take starts. Falls back to 'webm' only if nothing probes.
+export function getExtension() {
+  const m = mimeType || pickMime();
+  return m.startsWith('video/mp4') ? 'mp4' : 'webm';
+}
+
+// Human-readable, for the Record panel.
+export function getContainerLabel() {
+  return getExtension() === 'mp4'
+    ? 'MP4 (H.264)'
+    : 'WebM (VP9) - this browser has no MP4 encoder';
 }
 
 export function start() {
@@ -82,7 +104,8 @@ function finalize() {
   const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
   const url = URL.createObjectURL(blob);
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const name = `lecture-${stamp}.webm`;
+  const ext = (mimeType || '').startsWith('video/mp4') ? 'mp4' : 'webm';
+  const name = `lecture-${stamp}.${ext}`;
 
   const a = document.createElement('a');
   a.href = url;
