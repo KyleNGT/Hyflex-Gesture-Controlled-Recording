@@ -128,7 +128,7 @@ function drawReadout() {
   const head = [
     `gesture: ${status.gesture || '-'}`,
     `zone:    ${status.inZone ? 'in' : 'out'}${status.cooldown ? '  (cooldown)' : ''}`,
-    `dwell:   ${(status.dwellProgress * 100).toFixed(0)}%`,
+    `dwell:   ${(status.dwellProgress * 100).toFixed(0)}%${status.coasting ? '  (holding)' : ''}`,
   ];
   latestHands.forEach((hand, i) => {
     const on = Object.entries(fingerStates(hand.keypoints))
@@ -199,10 +199,14 @@ function drawDwellRing() {
 
   // Starting or stopping the take gets its own colour and a word in the middle:
   // this ring runs for 3 s, and it is the one command you cannot undo.
+  // While coasting (the gesture briefly lost but within the grace window) the
+  // arc dims, so a held-through dropout looks different from a live hold.
+  octx.globalAlpha = status.coasting ? 0.4 : 1;
   octx.strokeStyle = status.longDwell ? '#ff9f1a' : '#fff';
   octx.beginPath();
   octx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + status.dwellProgress * Math.PI * 2);
   octx.stroke();
+  octx.globalAlpha = 1;
 
   if (status.longDwell) {
     octx.fillStyle = '#ff9f1a';

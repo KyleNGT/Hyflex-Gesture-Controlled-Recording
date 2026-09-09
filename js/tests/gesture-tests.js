@@ -13,7 +13,7 @@ import {
 import { getState, setMode, setSlideCount } from '../state.js';
 import { POSE, makeHand } from './hand-fixtures.js';
 
-const IN_ZONE = { x: 640, y: 300 };    // centroid lands ~y=240, above the 288 line
+const IN_ZONE = { x: 640, y: 300 };    // centroid lands ~y=245, above the zone line
 const BELOW_ZONE = { x: 640, y: 700 };
 
 export function runTests() {
@@ -191,6 +191,50 @@ export function runTests() {
     feed([POSE.lshape({ at: { x: IN_ZONE.x + drift, y: IN_ZONE.y } })], 200);
     feed([POSE.lshape({ at: { x: IN_ZONE.x + drift, y: IN_ZONE.y } })], 400);
     eq(fired.length, 0);
+  });
+
+  // --- dwell coasting: ride out the detector, do not reset on every bad frame -
+
+  test('a one-frame dropout does not reset the dwell', () => {
+    setMode('idle');
+    fired.length = 0;
+    const hands = [POSE.lshape({ at: IN_ZONE })];
+    feed(hands, 5000);
+    feed(hands, CONFIG.DWELL_MS - 300);          // 80% of the way there
+    feed([], 100);                               // detector drops the hand for a frame
+    eq(fired.length, 0);
+    ok(getStatus().dwellProgress > 0.5, 'progress is held, not zeroed');
+    ok(getStatus().coasting, 'status should mark the dwell as coasting');
+    feed(hands, 400);                            // hand back -> completes
+    eq(fired[0], 'mode:presentation');
+  });
+
+  test('a dropout longer than the grace window resets the dwell', () => {
+    setMode('idle');
+    fired.length = 0;
+    const hands = [POSE.lshape({ at: IN_ZONE })];
+    feed(hands, 5000);
+    feed(hands, CONFIG.DWELL_MS - 100);          // 93% -- a resume would need only 100ms more
+    feed([], CONFIG.GESTURE_GRACE_MS + 100);     // gone too long: reset, not freeze
+    feed(hands, 300);                            // a resumed dwell would have fired by now
+    eq(fired.length, 0);
+    feed(hands, CONFIG.DWELL_MS);                // a full fresh dwell does fire
+    eq(fired[0], 'mode:presentation');
+  });
+
+  test('a Frame survives one hand blinking out mid-hold', () => {
+    setMode('idle');
+    fired.length = 0;
+    const frame = [
+      POSE.lshape({ at: { x: 500, y: 300 } }),
+      POSE.lshape({ at: { x: 900, y: 300 }, rotate: 180 }),
+    ];
+    feed(frame, 5000);
+    feed(frame, CONFIG.DWELL_MS - 400);
+    feed([frame[0]], 200);                       // 2nd hand gone: lone hand now reads as an L
+    feed(frame, 400);                            // both back
+    eq(fired[0], 'mode:whiteboard');
+    ok(!fired.includes('mode:presentation'), 'the lone L must never steal the dwell');
   });
 
   // --- pinch-drag clutch -------------------------------------------------

@@ -10,8 +10,10 @@ export const CONFIG = {
   DWELL_MS: 1500,          // hold a command gesture this long before it fires
   DWELL_MS_COMMIT: 3000,   // ...but gestures that start/end a take hold longer
   COOLDOWN_MS: 1000,       // dead time after a command fires
-  ACTION_ZONE_TOP: 0.4,    // gesture centroid must sit in the top 40% of frame
-  DRIFT_TOLERANCE: 0.06,   // normalized centroid drift that resets the dwell
+  ACTION_ZONE_TOP: 0.5,    // gesture centroid must sit in the top 50% of frame
+  DRIFT_TOLERANCE: 0.06,   // normalized wrist drift that resets the dwell
+  GESTURE_GRACE_MS: 300,   // a gesture lost for less than this freezes the dwell
+                           // instead of resetting it -- rides out detector dropouts
 
   // --- pinch-drag clutch (Presentation Mode slide nav) ---
   PINCH_ON: 0.35,          // pinchAmount below this -> clutch engages
@@ -36,7 +38,7 @@ export const CONFIG = {
     V_SPREAD_MIN: 0.45,    // index-tip <-> middle-tip distance, in scale units
 
     // Two-handed Frame: two L-shapes whose index fingers oppose each other.
-    FRAME_OPPOSE_MIN: 80,  // degrees between the two index directions
+    FRAME_OPPOSE_MIN: 55,  // degrees between the two index directions
     FRAME_SEP_MIN: 1.2,    // centroid separation, in scale units
 
     // Two-handed Time-Out: one hand vertical, one horizontal across it.

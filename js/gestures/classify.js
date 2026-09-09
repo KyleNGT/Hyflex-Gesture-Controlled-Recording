@@ -22,13 +22,15 @@ function g() { return CONFIG.GESTURE; }
 
 // --- one-handed ---------------------------------------------------------
 
-// L-Shape: thumb + index extended, other three curled, held at a corner angle.
-// The angle test separates a deliberate L from a lazy pointing hand whose
-// thumb happens to read as extended.
+// L-Shape: thumb + index extended, middle curled, held at a corner angle.
+// Ring and pinky are not tested -- they are the least reliably-curled fingers
+// and isExtended() flags a loosely-curled pinky as up, which would kill an
+// otherwise clean L. Middle-down plus the angle test already separate the L
+// from a V, an open palm, a shaka and a lazy pointing hand.
 export function lshapeDetail(hand) {
   const kp = hand.keypoints;
   const s = fingerStates(kp);
-  const fingersOk = s.thumb && s.index && !s.middle && !s.ring && !s.pinky;
+  const fingersOk = s.thumb && s.index && !s.middle;
   const angle = angleBetween(fingerDirection(kp, 'thumb'), fingerDirection(kp, 'index'));
   const angleOk = angle >= g().L_ANGLE_MIN && angle <= g().L_ANGLE_MAX;
   return { ok: fingersOk && angleOk, fingersOk, angle, angleOk };

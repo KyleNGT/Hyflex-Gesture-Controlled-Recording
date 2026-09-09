@@ -105,14 +105,20 @@ These exist to defeat the "Midas Touch" problem (natural gesticulation triggerin
 commands). All three gate **every command gesture**:
 
 1. **Action zone.** The hand's keypoint centroid must be in the **upper frame**
-   (near shoulder/face — roughly the top 40% of the video height). Movements below
-   the chest are ignored entirely. Check this *before* starting a dwell.
+   (near shoulder/face — the top 50% of the video height, `CONFIG.ACTION_ZONE_TOP`).
+   Movements below the chest are ignored entirely. Check this *before* starting a
+   dwell.
 2. **Dwell time.** The same gesture must be held for **1500 ms** while the hand
-   stays roughly stationary (centroid drift under a small threshold). Any change
-   of gesture class or leaving the zone resets the timer to 0.
+   stays roughly stationary (wrist drift under a small threshold). A real change
+   of gesture class, real drift, or leaving the zone resets the timer to 0 — but
+   the hand-pose detector drops and misreads frames constantly, so a gesture lost
+   for **less than `CONFIG.GESTURE_GRACE_MS` (300 ms)** *freezes* the dwell
+   (progress held, no competing dwell started) rather than resetting it. This
+   "coasting" is what makes a two-handed hold practical. See `gesture-engine.js`.
 3. **Visual feedback.** While dwelling, `ui.js` draws a circular **loading ring**
-   around the hand, filling `elapsed / 1500`. It completes → command fires once,
-   then a cooldown (~1 s) before another command can start.
+   around the hand, filling `elapsed / dwell`. The arc dims while coasting. It
+   completes → command fires once, then a cooldown (~1 s) before another command
+   can start.
 
 **State indicators (visible from across the room):**
 - Recording active → solid **red** border around the screen.
@@ -123,7 +129,7 @@ commands). All three gate **every command gesture**:
 
 | Gesture | Hand(s) | Recognizer sketch | Effect |
 |---|---|---|---|
-| **L-Shape** | one | thumb + index extended, other three curled | → **Presentation Mode**: PDF full-bleed, webcam PiP bottom-right |
+| **L-Shape** | one | thumb + index extended, middle curled (ring/pinky not tested), held at a corner angle | → **Presentation Mode**: PDF full-bleed, webcam PiP bottom-right |
 | **Pinch & Drag clutch** | one | thumb tip–index tip distance below threshold = "clutched"; track x; release to commit | Horizontal drag in Presentation Mode → prev/next slide. **Not dwell-based** — it's a continuous manipulation. Pinch avoids false positives from open-palm sweeps. |
 | **Two-handed Frame** | two | both hands making L-shapes, arranged as a rectangle | → **Whiteboard Mode**: hide slides, raw webcam feed to 100% fullscreen |
 | **Shaka** | one | thumb + pinky extended, index/middle/ring curled | → **Screenshare Mode**: screenshare fullscreen, webcam back to PiP |
