@@ -59,5 +59,5 @@ export const CONFIG = {
   // none of it reaches the recording. `on` is the master switch; the three
   // sub-flags gate individual layers. The dwell ring and clutch meter ignore
   // these -- they are core HCI feedback, not debug chrome.
-  OVERLAY: { on: true, metrics: true, skeleton: true, guide: true },
+  OVERLAY: { on: true, metrics: true, skeleton: true },
 };

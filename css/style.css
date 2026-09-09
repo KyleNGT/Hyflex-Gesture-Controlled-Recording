@@ -20,6 +20,10 @@
 
 * { box-sizing: border-box; }
 
+/* `hidden` must win over the component `display` rules below (a bare
+   `#notice { display: flex }` otherwise keeps a [hidden] banner on screen). */
+[hidden] { display: none !important; }
+
 html, body { height: 100%; }
 
 body {
@@ -355,7 +359,15 @@ kbd {
 
 /* ===== Quick guide ============================================== */
 
-#guide-panel[hidden] { display: none; }
+.guide-lead {
+  margin-top: 0;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
 
 .guide-table {
   width: 100%;

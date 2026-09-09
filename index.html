@@ -83,13 +83,15 @@
         <div id="ov-subs">
           <label class="check"><input type="checkbox" id="ov-metrics" checked><span>Metrics readout</span></label>
           <label class="check"><input type="checkbox" id="ov-skeleton" checked><span>Hand skeleton &amp; zone line</span></label>
-          <label class="check"><input type="checkbox" id="ov-guide" checked><span>Quick guide panel</span></label>
         </div>
         <button id="btn-tuner" class="btn btn-ghost">Tuning panel <kbd>t</kbd></button>
       </section>
 
       <section class="panel" id="guide-panel">
         <h2>Quick guide</h2>
+        <p class="hint guide-lead">Hold every gesture in the <b>upper half of your
+          camera view</b> (near your head and shoulders) — anything lower is
+          ignored, so natural hand movement never fires a command.</p>
         <table class="guide-table">
           <tr><th>Gesture</th><th>Hold</th><th>Does</th></tr>
           <tr><td>L-shape (thumb + index)</td><td>1.5 s</td><td>Presentation mode</td></tr>
@@ -99,9 +101,8 @@
           <tr><td>Time-out T (two hands)</td><td>1.5 s</td><td>Pause / resume</td></tr>
           <tr><td>V sign (index + middle, splayed)</td><td><b>3 s</b></td><td>Start / stop recording</td></tr>
         </table>
-        <p class="hint">Gestures only count in the <b>upper part of the frame</b>
-          (above the guide line). The V sign holds twice as long because it is the
-          one command that cannot be undone.</p>
+        <p class="hint">The V sign holds twice as long as the others because it is
+          the one command that cannot be undone.</p>
         <details>
           <summary>Keyboard shortcuts</summary>
           <p class="hint">

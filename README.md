@@ -12,9 +12,9 @@ See `CLAUDE.md` for the architecture and gesture design.
 Desktop screen-recorder shell: the **preview** (the stage canvas that gets
 recorded) fills the left; a titled header sits above it, and **every control —
 sources, record buttons, the studio-overlay switches and the quick guide — is in
-the right sidebar**. The "Studio overlay" switch turns the metrics readout, hand
-skeleton and quick guide on or off (with sub-toggles for each); none of them are
-ever part of the recorded file, and a dismissible banner says so.
+the right sidebar**. The "Studio overlay" switch (with sub-toggles for the
+metrics readout and the hand skeleton) turns the on-screen aids on or off; none
+of them are ever part of the recorded file, and a dismissible banner says so.
 
 ## Run
 

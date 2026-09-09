@@ -110,32 +110,29 @@ function initChrome() {
     on: document.getElementById('ov-on'),
     metrics: document.getElementById('ov-metrics'),
     skeleton: document.getElementById('ov-skeleton'),
-    guide: document.getElementById('ov-guide'),
   };
   const subs = document.getElementById('ov-subs');
-  const guidePanel = document.getElementById('guide-panel');
   const notice = document.getElementById('notice');
   const noticeClose = document.getElementById('notice-close');
   const tunerBtn = document.getElementById('btn-tuner');
 
-  for (const k of ['on', 'metrics', 'skeleton', 'guide']) els[k].checked = CONFIG.OVERLAY[k];
+  for (const k of ['on', 'metrics', 'skeleton']) els[k].checked = CONFIG.OVERLAY[k];
 
   // Push the checkbox states into CONFIG.OVERLAY and reflect the dependent UI.
   // announce=true means "if the master switch is now on, surface the notice"
   // (used on load and whenever the master switch is flipped, not on sub-toggles).
   chromeSync = (announce) => {
     const ov = CONFIG.OVERLAY;
-    for (const k of ['on', 'metrics', 'skeleton', 'guide']) ov[k] = els[k].checked;
+    for (const k of ['on', 'metrics', 'skeleton']) ov[k] = els[k].checked;
 
     subs.classList.toggle('disabled', !ov.on);
-    guidePanel.hidden = !(ov.on && ov.guide);
 
     if (!ov.on) notice.hidden = true;
     else if (announce && !noticeDismissed) notice.hidden = false;
   };
 
   els.on.addEventListener('change', () => chromeSync(true));
-  for (const k of ['metrics', 'skeleton', 'guide']) {
+  for (const k of ['metrics', 'skeleton']) {
     els[k].addEventListener('change', () => chromeSync(false));
   }
   noticeClose.addEventListener('click', () => {

@@ -101,11 +101,12 @@ detection loop (~15fps) ─► hand keypoints ─► gesture engine ─► COMMA
 are NOT drawn on the stage canvas.** They are separate DOM elements + a
 stacked overlay canvas, all owned by `ui.js`. They are studio aids for the
 professor (no live audience), not part of the lecture. The stage canvas holds
-lecture content only. The studio overlay (skeleton, guide line, metrics readout,
-quick-guide panel) is gated by `CONFIG.OVERLAY` — a master `on` plus `metrics` /
-`skeleton` / `guide` sub-flags, wired to the sidebar switches by `ui.js`. The
-dwell ring and clutch meter are **not** gated: they are core HCI feedback. There
-is no `CONFIG.DEBUG` any more.
+lecture content only. The studio overlay (skeleton + guide line, and the metrics
+readout) is gated by `CONFIG.OVERLAY` — a master `on` plus `metrics` / `skeleton`
+sub-flags, wired to the sidebar switches by `ui.js`. The dwell ring and clutch
+meter are **not** gated: they are core HCI feedback. The Quick guide panel is
+always visible and is not part of the overlay. There is no `CONFIG.DEBUG` any
+more.
 
 ## HCI rules — the core of the project
 
