@@ -37,9 +37,9 @@ function draw() {
 
   switch (state.mode) {
     case 'presentation': {
-      const page = getPage(state.slideIndex);
+      const page = state.slideCount ? getPage(state.slideIndex) : null;
       if (page) drawContain(page, 0, 0, w, h);
-      else placeholder('rendering slide…');
+      else placeholder(state.slideCount ? 'rendering slide…' : 'no PDF loaded');
       drawCamPip(cam);
       break;
     }

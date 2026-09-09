@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HyFlex — gesture tests</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font: 14px/1.5 ui-monospace, monospace;
+      background: #1b1b1b;
+      color: #eee;
+    }
+    h1 { font-size: 16px; margin: 0 0 4px; }
+    #summary { margin: 0 0 18px; opacity: 0.75; }
+    #summary.fail { color: #f77; opacity: 1; }
+    #summary.pass { color: #6f6; opacity: 1; }
+    ul { list-style: none; margin: 0; padding: 0; max-width: 820px; }
+    li { padding: 5px 0; border-bottom: 1px solid #2c2c2c; }
+    .pass::before { content: 'PASS  '; color: #6f6; }
+    .fail::before { content: 'FAIL  '; color: #f77; }
+    .msg { display: block; padding-left: 6ch; color: #f77; }
+  </style>
+</head>
+<body>
+  <h1>HyFlex gesture tests</h1>
+  <p id="summary">running…</p>
+  <ul id="list"></ul>
+
+  <script type="module">
+    import { runTests } from './js/tests/gesture-tests.js';
+
+    const results = runTests();
+    const failed = results.filter((r) => !r.pass);
+    const summary = document.getElementById('summary');
+    summary.textContent = `${results.length - failed.length}/${results.length} passing`;
+    summary.className = failed.length ? 'fail' : 'pass';
+
+    const list = document.getElementById('list');
+    for (const r of results) {
+      const li = document.createElement('li');
+      li.className = r.pass ? 'pass' : 'fail';
+      li.textContent = r.name;
+      if (r.message) {
+        const msg = document.createElement('span');
+        msg.className = 'msg';
+        msg.textContent = r.message;
+        li.appendChild(msg);
+      }
+      list.appendChild(li);
+    }
+  </script>
+</body>
+</html>

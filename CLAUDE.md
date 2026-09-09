@@ -45,8 +45,10 @@ python3 -m http.server 8000   # then open http://localhost:8000
 All app paths are relative, so the mount point / port does not matter. `media.js`
 throws a clear error if opened without a secure context.
 
-No test runner is configured. If you add tests, keep them runnable without a
-build (e.g. a `tests.html` page).
+Tests live in `js/tests/` and run with no build: open `tests.html` on the same
+static server. They drive the classifiers and the gesture engine with synthetic
+keypoints. Keep any new tests DOM-free and framework-free so they stay runnable
+that way.
 
 ## Architecture
 
@@ -74,6 +76,8 @@ detection loop (~15fps) ─► hand keypoints ─► gesture engine ─► COMMA
 | `compositor.js` | The rAF render loop: draw current mode onto the recording canvas |
 | `recorder.js` | `MediaRecorder` wrapper: start/stop/pause/resume, mux mic audio, download |
 | `ui.js` | DOM overlays: loading ring, red/yellow borders, buttons, status text |
+| `tuner.js` | Live threshold panel (`t`): mutates `CONFIG` in place, persists, exports a diff |
+| `tests/*.js` | Synthetic-keypoint tests for the classifiers + engine; run via `tests.html` |
 
 ### The compositing pipeline (do not deviate)
 
@@ -124,6 +128,7 @@ commands). All three gate **every command gesture**:
 | **Two-handed Frame** | two | both hands making L-shapes, arranged as a rectangle | → **Whiteboard Mode**: hide slides, raw webcam feed to 100% fullscreen |
 | **Shaka** | one | thumb + pinky extended, index/middle/ring curled | → **Screenshare Mode**: screenshare fullscreen, webcam back to PiP |
 | **Two-handed Time-Out (T-shape)** | two | one hand vertical (fingertips up), other horizontal across it | Toggle `MediaRecorder` pause/resume. Border red↔yellow. |
+| **V sign** | one | index + middle extended and splayed apart, ring/pinky curled | Start/stop the take. **Dwells for `DWELL_MS_COMMIT` (3 s), not the usual 1.5 s.** |
 
 Notes:
 - `maxHands: 2`. Two-handed gestures require both hands detected and each passing
@@ -157,9 +162,16 @@ fine; a short crossfade is a nice-to-have, not required).
    physical whiteboard. Repeat T-shape → resume, border red.
 5. **Frame** gesture → Whiteboard Mode (fullscreen raw webcam).
 6. **Shaka** → Screenshare Mode.
-7. Click **Stop Recording** (physical mouse) → file downloads automatically.
+7. Click **Stop Recording** (physical mouse), or hold the **V sign** for 3 s →
+   file downloads automatically.
 
-Start/Stop Recording are **mouse-only UI buttons**, by design. Gestures never
+Start/Stop Recording are also **mouse buttons**, and remain the primary path.
+The V-sign gesture reaches the same `startRecording()` / `stopRecording()` in
+`main.js`, so the two can never drift apart. It is deliberately harder to trigger
+than any other gesture — a 3 s dwell and an orange ring labelled START/STOP —
+because ending a take is the one command with no undo.
+
+Superseded note (kept for the record): the original spec said gestures never
 start or stop recording — only pause/resume and layout.
 
 ## Conventions & gotchas
@@ -175,4 +187,7 @@ start or stop recording — only pause/resume and layout.
   unavailable until a screen track exists.
 - Keep magic numbers (dwell ms, zone fraction, pinch threshold, drift threshold,
   cooldown ms) in one `config.js` object so they're tunable.
+- **Read `CONFIG` at call time, never destructure it into module scope.** The
+  live tuner mutates `CONFIG` in place while the app runs; a value captured at
+  import time silently stops responding to the sliders.
 - ASCII, 2-space indent, `const`/`let`, small modules, no framework patterns.

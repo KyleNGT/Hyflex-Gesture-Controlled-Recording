@@ -5,11 +5,12 @@
 //   3. Cooldown     - no second command for CONFIG.COOLDOWN_MS after one fires
 //
 // The pinch-drag slide clutch is handled separately and is NOT dwell-gated: it
-// is a continuous manipulation, which is the whole point of a clutch.
+// is a continuous manipulation, which is the whole point of a clutch. It is
+// still action-zone gated -- a clutch that engages at waist height would be the
+// same Midas-Touch failure by another route.
 
 import { CONFIG } from './config.js';
 import { classify, pinchState } from './gestures/classify.js';
-import { pinchAmount } from './gestures/fingers.js';
 import { getState, setMode, nextSlide, prevSlide } from './state.js';
 
 const GESTURE_COMMAND = {
@@ -17,7 +18,17 @@ const GESTURE_COMMAND = {
   frame: 'mode:whiteboard',
   shaka: 'mode:screenshare',
   timeout: 'toggle-pause',
+  vee: 'toggle-record',
 };
+
+// Commands that begin or end a take hold longer before firing. A false positive
+// on a layout change costs a second of confusion; a false positive here ends the
+// recording, which is the one mistake the professor cannot undo.
+const LONG_DWELL = new Set(['toggle-record']);
+
+function dwellFor(command) {
+  return LONG_DWELL.has(command) ? CONFIG.DWELL_MS_COMMIT : CONFIG.DWELL_MS;
+}
 
 let onCommand = () => {};
 
@@ -26,7 +37,14 @@ const status = {
   gesture: null,       // currently classified gesture (pre-dwell)
   dwellProgress: 0,    // 0..1
   ringAt: null,        // {x,y} centroid to draw the ring around, or null
+  longDwell: false,    // dwelling on a start/stop-the-take gesture
   inZone: false,
+  cooldown: false,
+  clutch: false,       // pinch clutch engaged
+  clutchDx: 0,         // normalized horizontal travel since the clutch engaged
+  pinch: null,         // raw pinch amount of the single visible hand
+  lastCommand: null,   // most recently fired command
+  lastCommandAt: 0,
 };
 
 let dwellStart = 0;
@@ -43,7 +61,7 @@ export function getStatus() { return status; }
 
 export function update(hands, now = performance.now()) {
   runCommandGestures(hands, now);
-  runPinchClutch(hands);
+  runPinchClutch(hands, now);
 }
 
 function runCommandGestures(hands, now) {
@@ -58,6 +76,7 @@ function runCommandGestures(hands, now) {
   status.inZone = inZone;
 
   const onCooldown = now < cooldownUntil;
+  status.cooldown = onCooldown;
   const valid = gesture && inZone && !onCooldown && GESTURE_COMMAND[gesture];
 
   if (!valid) {
@@ -74,21 +93,26 @@ function runCommandGestures(hands, now) {
     dwellCentroid = anchor;
   }
 
+  const command = GESTURE_COMMAND[gesture];
+  const need = dwellFor(command);
   const elapsed = now - dwellStart;
-  status.dwellProgress = Math.min(1, elapsed / CONFIG.DWELL_MS);
+  status.dwellProgress = Math.min(1, elapsed / need);
   status.ringAt = anchor;
+  status.longDwell = LONG_DWELL.has(command);
 
-  if (elapsed >= CONFIG.DWELL_MS) {
-    fire(GESTURE_COMMAND[gesture]);
-    cooldownUntil = now + CONFIG.COOLDOWN_MS;
+  if (elapsed >= need) {
+    fire(command, now);
     resetDwell();
   }
 }
 
-function fire(command) {
+function fire(command, now = performance.now()) {
   if (command.startsWith('mode:')) {
     setMode(command.slice(5));
   }
+  cooldownUntil = now + CONFIG.COOLDOWN_MS;
+  status.lastCommand = command;
+  status.lastCommandAt = now;
   onCommand(command);
 }
 
@@ -97,27 +121,58 @@ function resetDwell() {
   dwellCentroid = null;
   status.dwellProgress = 0;
   status.ringAt = null;
+  status.longDwell = false;
 }
 
 // Presentation Mode only. Pinch to engage, drag horizontally, release to commit.
-function runPinchClutch(hands) {
-  if (getState().mode !== 'presentation' || hands.length !== 1) {
-    clutchEngaged = false;
+function runPinchClutch(hands, now) {
+  const single = hands.length === 1 ? hands[0] : null;
+  const pinch = pinchState(single);
+  status.pinch = single ? pinch.amount : null;
+
+  if (!single || getState().mode !== 'presentation' || now < cooldownUntil) {
+    releaseClutch();
     return;
   }
-  const hand = hands[0];
-  const amount = pinchAmount(hand.keypoints);
-  const { x } = pinchState(hand);
 
-  if (!clutchEngaged && amount < CONFIG.PINCH_ON) {
-    clutchEngaged = true;
-    clutchStartX = x;
-  } else if (clutchEngaged && amount > CONFIG.PINCH_OFF) {
-    clutchEngaged = false;
-    const dx = (x - clutchStartX) / CONFIG.STAGE.w;
-    if (dx <= -CONFIG.DRAG_MIN) nextSlide();      // drag left -> advance
-    else if (dx >= CONFIG.DRAG_MIN) prevSlide();  // drag right -> back
+  const zoneLine = CONFIG.ACTION_ZONE_TOP * CONFIG.STAGE.h;
+  const inZone = single.centroid.y <= zoneLine;
+
+  if (!clutchEngaged) {
+    if (inZone && pinch.amount < CONFIG.PINCH_ON) {
+      clutchEngaged = true;
+      clutchStartX = pinch.x;
+      status.clutch = true;
+      status.clutchDx = 0;
+    }
+    return;
   }
+
+  const dx = (pinch.x - clutchStartX) / CONFIG.STAGE.w;
+  status.clutchDx = dx;
+
+  if (pinch.amount > CONFIG.PINCH_OFF) {
+    releaseClutch();
+    if (dx <= -CONFIG.DRAG_MIN) commitSlide('next', now);      // drag left  -> advance
+    else if (dx >= CONFIG.DRAG_MIN) commitSlide('prev', now);  // drag right -> back
+  }
+}
+
+function releaseClutch() {
+  clutchEngaged = false;
+  status.clutch = false;
+  status.clutchDx = 0;
+}
+
+function commitSlide(dir, now) {
+  if (dir === 'next') nextSlide();
+  else prevSlide();
+  // Share the command cooldown so a released clutch cannot immediately re-arm
+  // and double-advance on the same physical motion.
+  cooldownUntil = now + CONFIG.COOLDOWN_MS;
+  status.lastCommand = `slide:${dir}`;
+  status.lastCommandAt = now;
+  onCommand(`slide:${dir}`);
 }
 
 function anchorCentroid(hands) {
