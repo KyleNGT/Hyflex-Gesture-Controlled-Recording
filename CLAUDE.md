@@ -56,7 +56,7 @@ Two decoupled loops plus a command bus. Keep them decoupled.
 
 ```
 camera + screen streams ─┐
-                         ├─► compositor loop  (rAF, ~30fps) ─► <canvas> ─► captureStream ─► MediaRecorder ─► .webm
+                         ├─► compositor loop  (rAF, ~30fps) ─► <canvas> ─► captureStream ─► MediaRecorder ─► .mp4 / .webm
 PDF pages ───────────────┘        ▲
                                   │ current mode + slide index
 detection loop (~15fps) ─► hand keypoints ─► gesture engine ─► COMMAND events ─► app state
@@ -75,7 +75,7 @@ detection loop (~15fps) ─► hand keypoints ─► gesture engine ─► COMMA
 | `state.js` | App mode, slide index, recording state; single source of truth |
 | `compositor.js` | The rAF render loop: draw current mode onto the recording canvas |
 | `recorder.js` | `MediaRecorder` wrapper: start/stop/pause/resume, mux mic audio, download |
-| `ui.js` | DOM overlays: loading ring, red/yellow borders, buttons, status text |
+| `ui.js` | App shell chrome: header (mode chip + REC timer), the notice banner, the sidebar studio-overlay switches, red/yellow border, status text, and the overlay canvas (dwell ring, clutch meter, skeleton, guide line, metrics) |
 | `tuner.js` | Live threshold panel (`t`): mutates `CONFIG` in place, persists, exports a diff |
 | `tests/*.js` | Synthetic-keypoint tests for the classifiers + engine; run via `tests.html` |
 
@@ -88,16 +88,25 @@ detection loop (~15fps) ─► hand keypoints ─► gesture engine ─► COMMA
 4. Build the recorded stream as
    `new MediaStream([...stage.getVideoTracks(), micTrack])` so audio is in the
    same file.
-5. `MediaRecorder` with `video/webm;codecs=vp9,opus`, falling back to vp8/opus
-   then bare `video/webm`. Probe with `MediaRecorder.isTypeSupported`. **In-browser
-   `.mp4` recording is not reliably supported — output is `.webm`;** surface this
-   in the download filename rather than pretending.
+5. `MediaRecorder` prefers **`video/mp4` (H.264 + AAC)** — supported in Chromium
+   126+ and Safari — and falls back to `video/webm` (vp9/opus, then vp8, then
+   bare) where it is not, e.g. Firefox. Probe the `MIME_CANDIDATES` list with
+   `MediaRecorder.isTypeSupported`. Chromium writes *fragmented* MP4, which every
+   mainstream player reads. **The download extension always follows the container
+   the browser actually gave us** (`recorder.getExtension()`); a WebM blob is
+   never named `.mp4`.
 6. On stop: `new Blob(chunks, {type})` → object URL → auto-trigger download.
 
-**UI overlays (borders, loading ring, buttons) are NOT drawn on the stage canvas.**
-They are separate DOM elements over the app UI. They are studio aids for the
+**UI overlays (header, borders, loading ring, buttons, metrics, hand skeleton)
+are NOT drawn on the stage canvas.** They are separate DOM elements + a
+stacked overlay canvas, all owned by `ui.js`. They are studio aids for the
 professor (no live audience), not part of the lecture. The stage canvas holds
-lecture content only.
+lecture content only. The studio overlay (skeleton + guide line, and the metrics
+readout) is gated by `CONFIG.OVERLAY` — a master `on` plus `metrics` / `skeleton`
+sub-flags, wired to the sidebar switches by `ui.js`. The dwell ring and clutch
+meter are **not** gated: they are core HCI feedback. The Quick guide panel is
+always visible and is not part of the overlay. There is no `CONFIG.DEBUG` any
+more.
 
 ## HCI rules — the core of the project
 
@@ -105,14 +114,20 @@ These exist to defeat the "Midas Touch" problem (natural gesticulation triggerin
 commands). All three gate **every command gesture**:
 
 1. **Action zone.** The hand's keypoint centroid must be in the **upper frame**
-   (near shoulder/face — roughly the top 40% of the video height). Movements below
-   the chest are ignored entirely. Check this *before* starting a dwell.
+   (near shoulder/face — the top 50% of the video height, `CONFIG.ACTION_ZONE_TOP`).
+   Movements below the chest are ignored entirely. Check this *before* starting a
+   dwell.
 2. **Dwell time.** The same gesture must be held for **1500 ms** while the hand
-   stays roughly stationary (centroid drift under a small threshold). Any change
-   of gesture class or leaving the zone resets the timer to 0.
+   stays roughly stationary (wrist drift under a small threshold). A real change
+   of gesture class, real drift, or leaving the zone resets the timer to 0 — but
+   the hand-pose detector drops and misreads frames constantly, so a gesture lost
+   for **less than `CONFIG.GESTURE_GRACE_MS` (300 ms)** *freezes* the dwell
+   (progress held, no competing dwell started) rather than resetting it. This
+   "coasting" is what makes a two-handed hold practical. See `gesture-engine.js`.
 3. **Visual feedback.** While dwelling, `ui.js` draws a circular **loading ring**
-   around the hand, filling `elapsed / 1500`. It completes → command fires once,
-   then a cooldown (~1 s) before another command can start.
+   around the hand, filling `elapsed / dwell`. The arc dims while coasting. It
+   completes → command fires once, then a cooldown (~1 s) before another command
+   can start.
 
 **State indicators (visible from across the room):**
 - Recording active → solid **red** border around the screen.
@@ -123,7 +138,7 @@ commands). All three gate **every command gesture**:
 
 | Gesture | Hand(s) | Recognizer sketch | Effect |
 |---|---|---|---|
-| **L-Shape** | one | thumb + index extended, other three curled | → **Presentation Mode**: PDF full-bleed, webcam PiP bottom-right |
+| **L-Shape** | one | thumb + index extended, middle curled (ring/pinky not tested), held at a corner angle | → **Presentation Mode**: PDF full-bleed, webcam PiP bottom-right |
 | **Pinch & Drag clutch** | one | thumb tip–index tip distance below threshold = "clutched"; track x; release to commit | Horizontal drag in Presentation Mode → prev/next slide. **Not dwell-based** — it's a continuous manipulation. Pinch avoids false positives from open-palm sweeps. |
 | **Two-handed Frame** | two | both hands making L-shapes, arranged as a rectangle | → **Whiteboard Mode**: hide slides, raw webcam feed to 100% fullscreen |
 | **Shaka** | one | thumb + pinky extended, index/middle/ring curled | → **Screenshare Mode**: screenshare fullscreen, webcam back to PiP |
@@ -143,7 +158,7 @@ Notes:
 
 | Mode | Stage canvas contents |
 |---|---|
-| **Idle** (pre-record) | webcam preview, setup UI |
+| **Idle** (pre-record) | webcam preview (fullscreen cover) |
 | **Presentation** | current PDF page as background, webcam PiP bottom-right |
 | **Whiteboard** | raw webcam feed, fullscreen |
 | **Screenshare** | screenshare track fullscreen, webcam PiP bottom-right |

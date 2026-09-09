@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HyFlex — Gesture Lecture Recorder</title>
+  <title>HyFlex — Smart Gesture-Controlled Presentations</title>
   <link rel="stylesheet" href="css/style.css">
 
   <!--
@@ -22,42 +22,97 @@
        never the stage canvas, so it is impossible to record it by accident. -->
   <div id="border"></div>
 
-  <div id="stage-wrap">
-    <!-- ONLY #stage is recorded. -->
-    <canvas id="stage" width="1280" height="720"></canvas>
-    <!-- Overlays: drawn on screen for the professor, never captured. -->
-    <canvas id="overlay" width="1280" height="720"></canvas>
-    <div id="toast"></div>
-  </div>
+  <div id="app">
+    <!-- ===== Left: the preview (only #stage is recorded) ===== -->
+    <main id="studio">
+      <header id="app-header">
+        <h1>HyFlex<span>: Smart Gesture-Controlled Presentations</span></h1>
+        <div id="app-header-state">
+          <span id="mode-chip">idle</span>
+          <span id="rec-indicator" hidden><i></i><span id="rec-time">00:00</span></span>
+        </div>
+      </header>
 
-  <div id="controls">
-    <label>PDF <input type="file" id="pdf-input" accept="application/pdf"></label>
-    <button id="btn-screen">Pick Screen</button>
-    <button id="btn-start" disabled>Start Recording</button>
-    <button id="btn-stop" disabled>Stop Recording</button>
-    <span id="status">starting…</span>
-  </div>
+      <!-- Shown while the studio overlay is on. Not part of the recording. -->
+      <div id="notice" hidden>
+        <span>Metrics, the hand skeleton and the guide line are studio aids —
+          none of them appear in the recorded file.</span>
+        <button id="notice-close" aria-label="Dismiss">&times;</button>
+      </div>
 
-  <div id="legend">
-    <table>
-      <tr><th>Gesture</th><th>Hold</th><th>Does</th></tr>
-      <tr><td>L-shape (thumb + index)</td><td>1.5 s</td><td>Presentation mode</td></tr>
-      <tr><td>Pinch &amp; drag sideways</td><td>—</td><td>Prev / next slide</td></tr>
-      <tr><td>Two L-shapes framing</td><td>1.5 s</td><td>Whiteboard mode</td></tr>
-      <tr><td>Shaka (thumb + pinky)</td><td>1.5 s</td><td>Screenshare mode</td></tr>
-      <tr><td>Time-out T (two hands)</td><td>1.5 s</td><td>Pause / resume</td></tr>
-      <tr><td>V sign (index + middle, splayed)</td><td><b>3 s</b></td><td>Start / stop recording</td></tr>
-    </table>
-    <p>
-      Gestures only count in the <b>upper part of the frame</b> (above the dashed
-      line). The V sign holds for twice as long as the others because it is the
-      one command that cannot be undone.
-    </p>
-    <p id="help">
-      Keys: <b>1</b> presentation · <b>2</b> whiteboard · <b>3</b> screenshare ·
-      <b>0</b> idle · <b>←/→</b> slides · <b>Space</b> pause/resume ·
-      <b>r</b> start/stop · <b>t</b> tuning panel · <b>d</b> debug overlay
-    </p>
+      <div id="stage-wrap">
+        <!-- ONLY #stage is recorded. -->
+        <canvas id="stage" width="1280" height="720"></canvas>
+        <!-- Overlays: drawn on screen for the professor, never captured. -->
+        <canvas id="overlay" width="1280" height="720"></canvas>
+        <div id="toast"></div>
+      </div>
+
+      <div id="statusbar"><span id="status">starting…</span></div>
+    </main>
+
+    <!-- ===== Right: every control ===== -->
+    <aside id="sidebar">
+      <section class="panel">
+        <h2>Sources</h2>
+        <label class="field">
+          <span>Slides (PDF)</span>
+          <input type="file" id="pdf-input" accept="application/pdf">
+        </label>
+        <button id="btn-screen" class="btn btn-ghost">Pick screen to share</button>
+      </section>
+
+      <section class="panel">
+        <h2>Record</h2>
+        <div class="btn-row">
+          <button id="btn-start" class="btn btn-primary" disabled>Start</button>
+          <button id="btn-pause" class="btn btn-ghost" disabled>Pause</button>
+          <button id="btn-stop" class="btn btn-danger" disabled>Stop</button>
+        </div>
+        <p class="hint">Output: <span id="out-format">—</span>. Start and Stop are
+          mouse-only by design; gestures never begin or end a take.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Studio overlay</h2>
+        <label class="switch">
+          <input type="checkbox" id="ov-on" checked>
+          <span class="switch-track"></span>
+          <span>Show overlay <kbd>d</kbd></span>
+        </label>
+        <div id="ov-subs">
+          <label class="check"><input type="checkbox" id="ov-metrics" checked><span>Metrics readout</span></label>
+          <label class="check"><input type="checkbox" id="ov-skeleton" checked><span>Hand skeleton &amp; zone line</span></label>
+        </div>
+        <button id="btn-tuner" class="btn btn-ghost">Tuning panel <kbd>t</kbd></button>
+      </section>
+
+      <section class="panel" id="guide-panel">
+        <h2>Quick guide</h2>
+        <p class="hint guide-lead">Hold every gesture in the <b>upper half of your
+          camera view</b> (near your head and shoulders) — anything lower is
+          ignored, so natural hand movement never fires a command.</p>
+        <table class="guide-table">
+          <tr><th>Gesture</th><th>Hold</th><th>Does</th></tr>
+          <tr><td>L-shape (thumb + index)</td><td>1.5 s</td><td>Presentation mode</td></tr>
+          <tr><td>Pinch &amp; drag sideways</td><td>—</td><td>Prev / next slide</td></tr>
+          <tr><td>Two L-shapes framing</td><td>1.5 s</td><td>Whiteboard mode</td></tr>
+          <tr><td>Shaka (thumb + pinky)</td><td>1.5 s</td><td>Screenshare mode</td></tr>
+          <tr><td>Time-out T (two hands)</td><td>1.5 s</td><td>Pause / resume</td></tr>
+          <tr><td>V sign (index + middle, splayed)</td><td><b>3 s</b></td><td>Start / stop recording</td></tr>
+        </table>
+        <p class="hint">The V sign holds twice as long as the others because it is
+          the one command that cannot be undone.</p>
+        <details>
+          <summary>Keyboard shortcuts</summary>
+          <p class="hint">
+            <b>1</b> presentation · <b>2</b> whiteboard · <b>3</b> screenshare ·
+            <b>0</b> idle · <b>←/→</b> slides · <b>Space</b> pause/resume ·
+            <b>r</b> start/stop · <b>t</b> tuning panel · <b>d</b> overlay
+          </p>
+        </details>
+      </section>
+    </aside>
   </div>
 
   <!-- Live threshold tuner, built by js/tuner.js. -->

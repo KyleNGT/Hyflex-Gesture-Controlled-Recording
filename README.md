@@ -1,10 +1,20 @@
 # HyFlex — Gesture-Based Asynchronous Lecture Recorder
 
 PTF50-MCO. A browser-based, touchless lecture recording studio for AUF faculty.
-Layout changes are composited **live** into one downloadable `.webm` — no
-post-production editing.
+Layout changes are composited **live** into one downloadable file (**`.mp4`**
+where the browser can encode H.264 — Chromium 126+, Safari — otherwise `.webm`),
+with no post-production editing.
 
 See `CLAUDE.md` for the architecture and gesture design.
+
+## Layout
+
+Desktop screen-recorder shell: the **preview** (the stage canvas that gets
+recorded) fills the left; a titled header sits above it, and **every control —
+sources, record buttons, the studio-overlay switches and the quick guide — is in
+the right sidebar**. The "Studio overlay" switch (with sub-toggles for the
+metrics readout and the hand skeleton) turns the on-screen aids on or off; none
+of them are ever part of the recorded file, and a dismissible banner says so.
 
 ## Run
 
@@ -22,12 +32,14 @@ python3 -m http.server 8000     # then open http://localhost:8000
 
 ## Gestures
 
-All command gestures are gated the same way: the hand must be in the **upper 40%
-of the frame**, held **still** while a ring fills, then a 1 s cooldown.
+All command gestures are gated the same way: the hand must be in the **upper half
+of the frame**, held **still** while a ring fills, then a 1 s cooldown. A gesture
+briefly lost to the detector (under `GESTURE_GRACE_MS`) freezes the ring rather
+than resetting it.
 
 | Gesture | Hands | Hold | Effect |
 |---|---|---|---|
-| L-shape (thumb + index, others curled) | one | 1.5 s | Presentation mode |
+| L-shape (thumb + index up, middle curled) | one | 1.5 s | Presentation mode |
 | Pinch thumb+index, drag sideways, release | one | — | Previous / next slide |
 | Two L-shapes framing a rectangle | two | 1.5 s | Whiteboard mode |
 | Shaka (thumb + pinky, middle three curled) | one | 1.5 s | Screenshare mode |
@@ -51,13 +63,14 @@ while paused.
 | `Space` | pause / resume recording |
 | `r` | start / stop recording |
 | `t` | gesture tuning panel |
-| `d` | debug overlay (skeleton + per-test readout) |
+| `d` | studio overlay (skeleton + metrics + guide) on / off |
 
 ## Tuning the gestures
 
 Thresholds all live in `js/config.js`. Press **`t`** for a live panel that
-mutates them in place while the app runs — hold a gesture, watch the debug
-readout (`d`) show which condition is red, drag the slider until it goes green.
+mutates them in place while the app runs — hold a gesture, watch the metrics
+readout (`d`, or the Studio overlay switch) show which condition is red, drag the
+slider until it goes green.
 
 Tuning is saved to `localStorage` so a reload keeps it. **Copy for config.js**
 puts a paste-ready diff of the changed values on the clipboard; paste it into

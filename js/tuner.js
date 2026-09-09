@@ -18,6 +18,7 @@ const FIELDS = [
   { group: 'Gating', path: 'COOLDOWN_MS', min: 0, max: 3000, step: 50 },
   { group: 'Gating', path: 'ACTION_ZONE_TOP', min: 0.1, max: 1, step: 0.01 },
   { group: 'Gating', path: 'DRIFT_TOLERANCE', min: 0.01, max: 0.3, step: 0.005 },
+  { group: 'Gating', path: 'GESTURE_GRACE_MS', min: 0, max: 1000, step: 25 },
 
   { group: 'Pinch clutch', path: 'PINCH_ON', min: 0.1, max: 1.2, step: 0.01 },
   { group: 'Pinch clutch', path: 'PINCH_OFF', min: 0.1, max: 1.5, step: 0.01 },

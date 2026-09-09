@@ -15,14 +15,16 @@ import { initHandpose, start as startHandpose, stop as stopHandpose } from './ha
 import { update as updateEngine, setCommandHandler, getStatus } from './gesture-engine.js';
 import { startCompositor } from './compositor.js';
 import * as recorder from './recorder.js';
-import { initUI, setHands, setStatus, flash } from './ui.js';
+import { initUI, setHands, setStatus, flash, toggleOverlay } from './ui.js';
 import { initTuner, toggleTuner } from './tuner.js';
 
 const els = {
   pdf: document.getElementById('pdf-input'),
   screen: document.getElementById('btn-screen'),
   start: document.getElementById('btn-start'),
+  pause: document.getElementById('btn-pause'),
   stop: document.getElementById('btn-stop'),
+  outFormat: document.getElementById('out-format'),
 };
 
 const COMMAND_LABEL = {
@@ -113,7 +115,9 @@ function bindControls() {
   });
 
   els.start.addEventListener('click', startRecording);
+  els.pause.addEventListener('click', togglePause);
   els.stop.addEventListener('click', stopRecording);
+  els.outFormat.textContent = recorder.getContainerLabel();
 
   // Fires for a normal stop and for a recorder that dies on its own, so the
   // buttons and the border can never lie about MediaRecorder.state.
@@ -121,6 +125,8 @@ function bindControls() {
     setRecording(false, false);
     els.start.disabled = false;
     els.stop.disabled = true;
+    els.pause.disabled = true;
+    els.pause.textContent = 'Pause';
     flash(`saved ${name}`, 6000);
   });
 
@@ -136,10 +142,7 @@ function bindControls() {
       case ' ': e.preventDefault(); togglePause(); break;
       case 'r': case 'R': toggleRecord(); break;
       case 't': case 'T': toggleTuner(); break;
-      case 'd': case 'D':
-        CONFIG.DEBUG = !CONFIG.DEBUG;
-        flash(`debug overlay ${CONFIG.DEBUG ? 'on' : 'off'}`);
-        break;
+      case 'd': case 'D': toggleOverlay(); break;
       default: return;
     }
   });
@@ -172,6 +175,8 @@ function startRecording() {
   setRecording(true, false);
   els.start.disabled = true;
   els.stop.disabled = false;
+  els.pause.disabled = false;
+  els.pause.textContent = 'Pause';
   flash('recording');
 }
 
@@ -190,9 +195,11 @@ function togglePause() {
   if (recorder.isPaused()) {
     recorder.resume();
     setRecording(true, false);
+    els.pause.textContent = 'Pause';
   } else {
     recorder.pause();
     setRecording(true, true);
+    els.pause.textContent = 'Resume';
   }
 }
 
